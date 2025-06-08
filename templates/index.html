@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF処理アプリ</title>
+    <style>
+        :root {
+            --sunflower-yellow: #FFD700;
+            --sunflower-brown: #8B4513;
+            --sunflower-green: #228B22;
+            --summer-sky: #87CEEB;
+            --warm-white: #FFF8DC;
+        }
+        
+        body {
+            font-family: "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3", Meiryo, メイリオ, Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--summer-sky) 0%, var(--warm-white) 100%);
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--sunflower-brown);
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            position: relative;
+            padding-left: 40px;
+            padding-right: 40px;
+        }
+
+        h1::before, h1::after {
+            content: "🌻";
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        h1::before {
+            left: 0;
+        }
+
+        h1::after {
+            right: 0;
+        }
+
+        .section {
+            border: 3px solid var(--sunflower-yellow);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+        }
+
+        h2 {
+            color: var(--sunflower-brown);
+            border-bottom: 2px dashed var(--sunflower-yellow);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 2px solid var(--sunflower-green);
+            border-radius: 10px;
+            display: none;
+            background-color: var(--warm-white);
+        }
+
+        button {
+            background-color: var(--sunflower-yellow);
+            color: var(--sunflower-brown);
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            background-color: #FFC000;
+            transform: scale(1.05);
+        }
+
+        input[type="file"], input[type="text"], input[type="number"] {
+            margin: 10px 0;
+            padding: 8px;
+            border: 2px solid var(--sunflower-yellow);
+            border-radius: 5px;
+            background-color: white;
+        }
+
+        input[type="file"] {
+            border: none;
+        }
+
+        .error {
+            color: #FF4500;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: rgba(255, 69, 0, 0.1);
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: var(--warm-white);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--sunflower-yellow);
+        }
+
+        /* フォーム内の配置を整える */
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: start;
+        }
+
+        /* ファイル選択とボタンのコンテナ */
+        .form-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* レスポンシブデザイン */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            button {
+                width: 100%;
+                margin: 5px 0;
+            }
+
+            .form-group {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            input[type="file"], input[type="text"], input[type="number"] {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF処理アプリケーション</h1>
+
+    <!-- PDFアップロードと情報表示 -->
+    <div class="section">
+        <h2>📄 PDFファイル情報</h2>
+        <form id="uploadForm">
+            <div class="form-group">
+                <input type="file" name="file" accept=".pdf" required>
+                <button type="submit">アップロード</button>
+            </div>
+        </form>
+        <div id="fileInfo" class="result"></div>
+    </div>
+
+    <!-- テキスト抽出 -->
+    <div class="section">
+        <h2>📝 テキスト抽出</h2>
+        <form id="extractForm">
+            <div class="form-group">
+                <input type="file" name="file" accept=".pdf" required>
+                <button type="submit">テキスト抽出</button>
+            </div>
+        </form>
+        <pre id="extractedText" class="result"></pre>
+    </div>
+
+    <!-- PDF結合 -->
+    <div class="section">
+        <h2>🔗 PDF結合</h2>
+        <form id="mergeForm">
+            <div class="form-group">
+                <input type="file" name="files[]" accept=".pdf" multiple required>
+                <button type="submit">PDFを結合</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- PDF分割 -->
+    <div class="section">
+        <h2>✂️ PDF分割</h2>
+        <form id="splitForm">
+            <div class="form-group">
+                <input type="file" name="file" accept=".pdf" required>
+                <input type="text" name="pages" placeholder="ページ範囲（例: 1-3,5,7-9）" required>
+                <button type="submit">PDFを分割</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- PDF回転 -->
+    <div class="section">
+        <h2>🔄 PDF回転</h2>
+        <form id="rotateForm">
+            <div class="form-group">
+                <input type="file" name="file" accept=".pdf" required>
+                <input type="number" name="rotation" value="90" step="90" min="0" max="270">
+                <button type="submit">PDFを回転</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 透かし追加 -->
+    <div class="section">
+        <h2>💧 透かし追加</h2>
+        <form id="watermarkForm">
+            <div class="form-group">
+                <div>メインPDF: <input type="file" name="file" accept=".pdf" required></div>
+                <div>透かしPDF: <input type="file" name="watermark" accept=".pdf" required></div>
+                <button type="submit">透かしを追加</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // ファイル情報の表示
+        document.getElementById('uploadForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const result = document.getElementById('fileInfo');
+                result.style.display = 'block';
+                result.innerHTML = `
+                    <h3>PDFの情報:</h3>
+                    <p>ファイル名: ${data.ファイル名}</p>
+                    <p>ページ数: ${data.ページ数}</p>
+                    <p>ファイルサイズ: ${Math.round(data.ファイルサイズ / 1024)} KB</p>
+                `;
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+
+        // テキスト抽出
+        document.getElementById('extractForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/extract-text', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const result = document.getElementById('extractedText');
+                result.style.display = 'block';
+                result.textContent = data.text;
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+
+        // PDF結合
+        document.getElementById('mergeForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/merge-pdfs', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'merged.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+
+        // PDF分割
+        document.getElementById('splitForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/split-pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'split.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+
+        // PDF回転
+        document.getElementById('rotateForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/rotate-pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'rotated.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+
+        // 透かし追加
+        document.getElementById('watermarkForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/add-watermark', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'watermarked.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+    </script>
+</body>
+</html> 
