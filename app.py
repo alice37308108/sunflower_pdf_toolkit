@@ -4,6 +4,10 @@ import os
 from dotenv import load_dotenv
 import io
 from werkzeug.utils import secure_filename
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+from PIL import Image
 
 app = Flask(__name__)
 load_dotenv()
@@ -21,6 +25,64 @@ def is_valid_pdf(file):
         return True
     except Exception:
         return False
+
+def is_valid_image(file):
+    try:
+        img = Image.open(file)
+        img.verify()
+        # ファイルポインタを先頭に戻す
+        file.seek(0)
+        return True
+    except Exception:
+        return False
+
+def create_watermark_pdf_from_image(image_file, page_width, page_height, opacity=0.3):
+    """画像から透かし用PDFを作成"""
+    try:
+        # 画像を開く
+        img = Image.open(image_file)
+        
+        # 透明度を設定（RGBA形式に変換）
+        if img.mode != 'RGBA':
+            img = img.convert('RGBA')
+        
+        # 透明度を調整
+        alpha = img.split()[-1]
+        alpha = alpha.point(lambda p: int(p * opacity))
+        img.putalpha(alpha)
+        
+        # ImageReaderオブジェクトを作成
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        img_reader = ImageReader(img_buffer)
+        
+        # PDFを作成
+        pdf_buffer = io.BytesIO()
+        c = canvas.Canvas(pdf_buffer, pagesize=(page_width, page_height))
+        
+        # 画像のサイズを計算（ページサイズに合わせてスケーリング）
+        img_width, img_height = img.size
+        scale_x = page_width / img_width
+        scale_y = page_height / img_height
+        scale = min(scale_x, scale_y) * 0.8  # 少し小さくして余白を作る
+        
+        new_width = img_width * scale
+        new_height = img_height * scale
+        
+        # 中央に配置
+        x = (page_width - new_width) / 2
+        y = (page_height - new_height) / 2
+        
+        # 画像を描画（ImageReaderオブジェクトを使用）
+        c.drawImage(img_reader, x, y, width=new_width, height=new_height, mask='auto')
+        c.save()
+        
+        pdf_buffer.seek(0)
+        return pdf_buffer
+        
+    except Exception as e:
+        raise Exception(f"画像から透かしPDFの作成に失敗しました: {str(e)}")
 
 @app.route('/')
 def index():
@@ -283,24 +345,67 @@ def add_watermark():
         if file.filename == '' or watermark.filename == '':
             return jsonify({'error': 'ファイルが選択されていません'}), 400
 
-        if not file.filename.endswith('.pdf') or not watermark.filename.endswith('.pdf'):
-            return jsonify({'error': 'PDFファイルのみ対応しています'}), 400
+        # メインファイルはPDFのみ
+        if not file.filename.endswith('.pdf'):
+            return jsonify({'error': 'メインファイルはPDF形式である必要があります'}), 400
 
         if not is_valid_pdf(file):
             return jsonify({'error': 'メインPDFファイルの読み込みに失敗しました。ファイルが破損しているか、正しいPDF形式ではありません。'}), 400
 
-        if not is_valid_pdf(watermark):
-            return jsonify({'error': '透かしPDFファイルの読み込みに失敗しました。ファイルが破損しているか、正しいPDF形式ではありません。'}), 400
+        # 透かしファイルは画像またはPDF
+        watermark_ext = watermark.filename.lower().split('.')[-1]
+        allowed_extensions = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp']
+        
+        if watermark_ext not in allowed_extensions:
+            return jsonify({'error': '透かしファイルはPDF、PNG、JPG、JPEG、GIF、BMP形式のいずれかである必要があります'}), 400
 
         reader = PdfReader(file)
-        watermark_reader = PdfReader(watermark)
         writer = PdfWriter()
         
-        watermark_page = watermark_reader.pages[0]
-        
-        for page in reader.pages:
-            page.merge_page(watermark_page)
-            writer.add_page(page)
+        # 透かしファイルの種類によって処理を分岐
+        if watermark_ext == 'pdf':
+            # PDFファイルの場合（従来の処理）
+            if not is_valid_pdf(watermark):
+                return jsonify({'error': '透かしPDFファイルの読み込みに失敗しました。ファイルが破損しているか、正しいPDF形式ではありません。'}), 400
+            
+            watermark_reader = PdfReader(watermark)
+            watermark_page = watermark_reader.pages[0]
+            
+            for page in reader.pages:
+                page.merge_page(watermark_page)
+                writer.add_page(page)
+        else:
+            # 画像ファイルの場合
+            if not is_valid_image(watermark):
+                return jsonify({'error': '透かし画像ファイルの読み込みに失敗しました。ファイルが破損しているか、対応していない形式です。'}), 400
+            
+            # 最初のページのサイズを取得して透かしPDFを作成
+            first_page = reader.pages[0]
+            page_box = first_page.mediabox
+            page_width = float(page_box.width)
+            page_height = float(page_box.height)
+            
+            # 画像から透かしPDFを作成
+            watermark_pdf_buffer = create_watermark_pdf_from_image(watermark, page_width, page_height)
+            watermark_reader = PdfReader(watermark_pdf_buffer)
+            watermark_page = watermark_reader.pages[0]
+            
+            for page in reader.pages:
+                # 各ページのサイズに合わせて透かしを調整
+                current_page_box = page.mediabox
+                current_width = float(current_page_box.width)
+                current_height = float(current_page_box.height)
+                
+                # ページサイズが異なる場合は新しい透かしを作成
+                if abs(current_width - page_width) > 1 or abs(current_height - page_height) > 1:
+                    watermark.seek(0)  # ファイルポインタをリセット
+                    watermark_pdf_buffer = create_watermark_pdf_from_image(watermark, current_width, current_height)
+                    watermark_reader = PdfReader(watermark_pdf_buffer)
+                    watermark_page = watermark_reader.pages[0]
+                    page_width, page_height = current_width, current_height
+                
+                page.merge_page(watermark_page)
+                writer.add_page(page)
         
         output = io.BytesIO()
         writer.write(output)

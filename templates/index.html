@@ -281,7 +281,8 @@
                     <div id="watermarkOptions" class="operation-panel">
                         <h3>ウォーターマーク設定</h3>
                         <div class="form-group">
-                            <input type="file" name="watermark" accept=".pdf">
+                            <label for="watermarkFile">透かしファイル (PDF、PNG、JPG、JPEG、GIF、BMP):</label>
+                            <input type="file" name="watermark" id="watermarkFile" accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp">
                         </div>
                         <button type="submit">透かし追加</button>
                     </div>
@@ -515,9 +516,7 @@
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
 
-                // 処理結果をダウンロード
-                const a = document.createElement('a');
-                a.href = url;
+                // ファイル名を決定
                 let filename = '';
                 switch(op) {
                     case 'split':
@@ -533,17 +532,52 @@
                         filename = 'watermarked.pdf';
                         break;
                 }
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
 
-                // プレビューも更新
+                // プレビューを更新
                 loadPDF(url);
                 
-                // 成功メッセージを表示
+                // ダウンロードボタンを表示
                 result.style.display = 'block';
-                result.innerHTML = `<div style="color: green; padding: 10px;">処理が完了しました。ファイルのダウンロードが開始されます。</div>`;
+                result.innerHTML = `
+                    <div style="color: green; padding: 10px; text-align: center;">
+                        <p>✅ 処理が完了しました！</p>
+                        <button id="downloadBtn" style="
+                            background-color: var(--sunflower-yellow);
+                            color: var(--sunflower-brown);
+                            padding: 12px 24px;
+                            border: none;
+                            border-radius: 25px;
+                            cursor: pointer;
+                            margin: 10px;
+                            font-weight: bold;
+                            font-size: 16px;
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.backgroundColor='#FFC000'; this.style.transform='scale(1.05)'" 
+                           onmouseout="this.style.backgroundColor='var(--sunflower-yellow)'; this.style.transform='scale(1)'">
+                            📥 ${filename} をダウンロード
+                        </button>
+                        <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                            プレビューで結果を確認してからダウンロードしてください
+                        </p>
+                    </div>
+                `;
+                
+                // ダウンロードボタンのイベントリスナーを追加
+                document.getElementById('downloadBtn').addEventListener('click', function() {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // ダウンロード後にボタンの表示を変更
+                    this.innerHTML = '✅ ダウンロード完了';
+                    this.style.backgroundColor = '#90EE90';
+                    this.style.cursor = 'default';
+                    this.disabled = true;
+                });
             } catch (error) {
                 result.style.display = 'block';
                 result.innerHTML = `<div class="error">エラーが発生しました: ${error.message}</div>`;
