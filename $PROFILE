@@ -1,6 +1,0 @@
-# PowerShellの出力エンコーディングをUTF-8に設定
-$OutputEncoding = [System.Text.Encoding]::UTF8
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
-# Gitのエンコーディングも設定
-$env:LANG = "ja_JP.UTF-8" 
