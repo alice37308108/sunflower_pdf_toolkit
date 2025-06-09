@@ -198,6 +198,128 @@
             padding: 20px;
         }
 
+        .file-list {
+            margin-top: 10px;
+            min-height: 100px;
+            border: 2px dashed var(--sunflower-yellow);
+            border-radius: 10px;
+            padding: 10px;
+            background-color: rgba(255, 248, 220, 0.5);
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin: 5px 0;
+            background-color: white;
+            border: 1px solid var(--sunflower-yellow);
+            border-radius: 5px;
+            cursor: move;
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            background-color: var(--warm-white);
+        }
+
+        .file-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: var(--sunflower-brown);
+        }
+
+        .file-number {
+            background-color: var(--sunflower-yellow);
+            color: var(--sunflower-brown);
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .file-actions button {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--sunflower-brown);
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        .operation-buttons {
+            margin-bottom: 20px;
+        }
+
+        .operation-buttons h3 {
+            color: var(--sunflower-brown);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .operation-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 15px;
+            background-color: white;
+            border: 3px solid var(--sunflower-yellow);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            min-height: 100px;
+        }
+
+        .operation-btn:hover {
+            background-color: var(--warm-white);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .operation-btn.active {
+            background-color: var(--sunflower-yellow);
+            border-color: var(--sunflower-brown);
+            color: var(--sunflower-brown);
+        }
+
+        .operation-btn .btn-icon {
+            font-size: 2em;
+            margin-bottom: 8px;
+        }
+
+        .operation-btn .btn-text {
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
+
         @media (max-width: 1200px) {
             .container {
                 flex-direction: column;
@@ -211,6 +333,32 @@
                 min-width: 100%;
             }
         }
+
+        @media (max-width: 768px) {
+            .button-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .operation-btn {
+                min-height: 80px;
+                padding: 15px 10px;
+            }
+            
+            .operation-btn .btn-icon {
+                font-size: 1.5em;
+                margin-bottom: 5px;
+            }
+            
+            .operation-btn .btn-text {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .button-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -220,22 +368,55 @@
         <div class="control-panel">
             <div class="section">
                 <h2>📄 PDFファイル処理</h2>
-                <form id="pdfForm">
-                    <div class="form-group">
-                        <input type="file" name="file" id="pdfFile" accept=".pdf" required>
+                
+                <!-- 処理選択ボタン -->
+                <div class="operation-buttons">
+                    <h3>処理を選択してください</h3>
+                    <div class="button-grid">
+                        <button type="button" class="operation-btn" data-operation="merge">
+                            <span class="btn-icon">🔗</span>
+                            <span class="btn-text">PDF結合</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="split">
+                            <span class="btn-icon">✂️</span>
+                            <span class="btn-text">PDF分割</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="rotate">
+                            <span class="btn-icon">🔄</span>
+                            <span class="btn-text">PDF回転</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="delete">
+                            <span class="btn-icon">🗑️</span>
+                            <span class="btn-text">ページ削除</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="watermark">
+                            <span class="btn-icon">🏷️</span>
+                            <span class="btn-text">透かし追加</span>
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <select name="operation" id="operation">
-                            <option value="">処理を選択してください</option>
-                            <option value="split">PDF分割</option>
-                            <option value="rotate">PDF回転</option>
-                            <option value="delete">ページ削除</option>
-                            <option value="watermark">ウォーターマーク追加</option>
-                        </select>
+                </div>
+
+                <form id="pdfForm">
+                    <!-- メインファイル選択（結合以外で表示） -->
+                    <div id="mainFileSection" class="form-group" style="display: none;">
+                        <label for="pdfFile">PDFファイルを選択してください:</label>
+                        <input type="file" name="file" id="pdfFile" accept=".pdf">
                     </div>
 
-                    <div class="current-page-preview">
+                    <div id="pagePreview" class="current-page-preview" style="display: none;">
                         現在のページ: <span id="currentPage">-</span> / <span id="totalPages">-</span>
+                    </div>
+
+                    <!-- 結合オプション -->
+                    <div id="mergeOptions" class="operation-panel">
+                        <h3>結合設定</h3>
+                        <div class="form-group">
+                            <label for="mergeFiles">結合するPDFファイル（複数選択可）:</label>
+                            <input type="file" name="merge_files" id="mergeFiles" multiple accept=".pdf">
+                            <div class="file-list" id="fileList"></div>
+                            <p class="help-text">ファイルをドラッグ&ドロップで順番を変更できます</p>
+                        </div>
+                        <button type="submit">結合実行</button>
                     </div>
 
                     <!-- 分割オプション -->
@@ -388,12 +569,67 @@
         };
 
         const form = document.getElementById('pdfForm');
-        const operation = document.getElementById('operation');
+        const mergeOptions = document.getElementById('mergeOptions');
         const splitOptions = document.getElementById('splitOptions');
         const rotateOptions = document.getElementById('rotateOptions');
         const deleteOptions = document.getElementById('deleteOptions');
         const watermarkOptions = document.getElementById('watermarkOptions');
         const result = document.getElementById('result');
+        
+        let currentOperation = null;
+        
+        // 操作ボタンのイベントリスナー
+        document.querySelectorAll('.operation-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 全てのボタンからactiveクラスを削除
+                document.querySelectorAll('.operation-btn').forEach(b => b.classList.remove('active'));
+                
+                // クリックされたボタンにactiveクラスを追加
+                this.classList.add('active');
+                
+                // 現在の操作を設定
+                currentOperation = this.dataset.operation;
+                
+                // パネルとファイル選択の表示を更新
+                updateUIForOperation(currentOperation);
+            });
+        });
+        
+        function updateUIForOperation(operation) {
+            // 全てのパネルを非表示
+            const panels = [mergeOptions, splitOptions, rotateOptions, deleteOptions, watermarkOptions];
+            panels.forEach(panel => panel.style.display = 'none');
+            
+            // メインファイル選択とページプレビューの表示制御
+            const mainFileSection = document.getElementById('mainFileSection');
+            const pagePreview = document.getElementById('pagePreview');
+            
+            if (operation === 'merge') {
+                // 結合の場合：メインファイル選択を非表示、結合パネルを表示
+                mainFileSection.style.display = 'none';
+                pagePreview.style.display = 'none';
+                mergeOptions.style.display = 'block';
+            } else {
+                // その他の場合：メインファイル選択を表示
+                mainFileSection.style.display = 'block';
+                pagePreview.style.display = 'block';
+                
+                switch(operation) {
+                    case 'split':
+                        splitOptions.style.display = 'block';
+                        break;
+                    case 'rotate':
+                        rotateOptions.style.display = 'block';
+                        break;
+                    case 'delete':
+                        deleteOptions.style.display = 'block';
+                        break;
+                    case 'watermark':
+                        watermarkOptions.style.display = 'block';
+                        break;
+                }
+            }
+        }
         
         // ファイル選択時にサーバーでの検証を実行
         document.getElementById('pdfFile').addEventListener('change', async function(e) {
@@ -431,27 +667,6 @@
             }
         });
         
-        // 操作選択に応じてオプションを表示/非表示
-        operation.addEventListener('change', function() {
-            const panels = [splitOptions, rotateOptions, deleteOptions, watermarkOptions];
-            panels.forEach(panel => panel.style.display = 'none');
-            
-            switch(this.value) {
-                case 'split':
-                    splitOptions.style.display = 'block';
-                    break;
-                case 'rotate':
-                    rotateOptions.style.display = 'block';
-                    break;
-                case 'delete':
-                    deleteOptions.style.display = 'block';
-                    break;
-                case 'watermark':
-                    watermarkOptions.style.display = 'block';
-                    break;
-            }
-        });
-        
         // 回転タイプの選択に応じてページ範囲入力を表示/非表示
         document.getElementById('rotateType').addEventListener('change', function() {
             const rotatePages = document.getElementById('rotatePages');
@@ -469,7 +684,7 @@
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             const formData = new FormData(this);
-            const op = operation.value;
+            const op = currentOperation;
             if (!op) {
                 alert('処理を選択してください');
                 return;
@@ -488,6 +703,9 @@
             
             let endpoint;
             switch(op) {
+                case 'merge':
+                    endpoint = '/merge-pdfs';
+                    break;
                 case 'split':
                     endpoint = '/split-pdf';
                     break;
@@ -519,6 +737,9 @@
                 // ファイル名を決定
                 let filename = '';
                 switch(op) {
+                    case 'merge':
+                        filename = 'merged.pdf';
+                        break;
                     case 'split':
                         filename = 'split.pdf';
                         break;
@@ -583,6 +804,139 @@
                 result.innerHTML = `<div class="error">エラーが発生しました: ${error.message}</div>`;
             }
         });
+
+        // 結合機能のファイル管理
+        let selectedFiles = [];
+        
+        document.getElementById('mergeFiles').addEventListener('change', function(e) {
+            const newFiles = Array.from(e.target.files);
+            
+            newFiles.forEach(file => {
+                if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+            
+            updateFileList();
+        });
+        
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '<p style="text-align: center; color: #999;">ファイルが選択されていません</p>';
+                return;
+            }
+            
+            fileList.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.draggable = true;
+                fileItem.dataset.index = index;
+                
+                fileItem.innerHTML = `
+                    <div style="display: flex; align-items: center;">
+                        <div class="file-number">${index + 1}</div>
+                        <div class="file-name">${file.name}</div>
+                    </div>
+                    <div class="file-actions">
+                        <button type="button" onclick="moveFile(${index}, -1)">↑</button>
+                        <button type="button" onclick="moveFile(${index}, 1)">↓</button>
+                        <button type="button" onclick="removeFile(${index})">✕</button>
+                    </div>
+                `;
+                
+                // ドラッグ&ドロップのイベントリスナー
+                fileItem.addEventListener('dragstart', handleDragStart);
+                fileItem.addEventListener('dragover', handleDragOver);
+                fileItem.addEventListener('drop', handleDrop);
+                fileItem.addEventListener('dragend', handleDragEnd);
+                
+                fileList.appendChild(fileItem);
+            });
+            
+            updateFormData();
+        }
+        
+        function moveFile(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= selectedFiles.length) return;
+            
+            [selectedFiles[index], selectedFiles[newIndex]] = [selectedFiles[newIndex], selectedFiles[index]];
+            updateFileList();
+        }
+        
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+        }
+        
+        function updateFormData() {
+            // FormDataを更新するために、隠し要素を使用
+            const form = document.getElementById('pdfForm');
+            
+            // 既存の結合ファイル入力を削除
+            const existingInputs = form.querySelectorAll('input[name="files[]"]');
+            existingInputs.forEach(input => input.remove());
+            
+            // 新しい順序でファイル入力を追加
+            selectedFiles.forEach((file, index) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.name = 'files[]';
+                input.style.display = 'none';
+                
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                
+                form.appendChild(input);
+            });
+        }
+        
+        // ドラッグ&ドロップ機能
+        let draggedElement = null;
+        
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            if (draggedElement !== this) {
+                const draggedIndex = parseInt(draggedElement.dataset.index);
+                const targetIndex = parseInt(this.dataset.index);
+                
+                const draggedFile = selectedFiles[draggedIndex];
+                selectedFiles.splice(draggedIndex, 1);
+                selectedFiles.splice(targetIndex, 0, draggedFile);
+                
+                updateFileList();
+            }
+            
+            return false;
+        }
+        
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedElement = null;
+        }
     </script>
 </body>
 </html> 
