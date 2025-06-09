@@ -1,3 +1,25 @@
+"""
+PDF処理ツールキット Web アプリケーション
+
+このアプリケーションは Flask を使用したPDF処理ツールキットです。
+以下の機能を提供します：
+- PDF結合（複数のPDFファイルを1つに結合）
+- PDF分割（指定したページ範囲でPDFを分割）
+- PDF回転（特定のページまたは全ページを回転）
+- ページ削除（指定したページをPDFから削除）
+- 透かし追加（PDFや画像を透かしとして追加）
+- テキスト抽出（PDFからテキストを抽出）
+
+使用技術：
+- Flask（Webフレームワーク）
+- PyPDF2（PDF処理）
+- ReportLab（PDF生成）
+- PIL（画像処理）
+
+作成者: Sunflower PDF Toolkit
+バージョン: 1.0
+"""
+
 from flask import Flask, request, render_template, send_file, jsonify
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 import os
@@ -18,6 +40,18 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 def is_valid_pdf(file):
+    """
+    PDFファイルの妥当性を検証する関数
+    
+    Args:
+        file: アップロードされたファイルオブジェクト
+        
+    Returns:
+        bool: PDFファイルが有効な場合True、そうでなければFalse
+        
+    Note:
+        ファイルポインタは関数終了後に先頭に戻されます
+    """
     try:
         reader = PdfReader(file)
         # ファイルポインタを先頭に戻す
@@ -27,6 +61,18 @@ def is_valid_pdf(file):
         return False
 
 def is_valid_image(file):
+    """
+    画像ファイルの妥当性を検証する関数
+    
+    Args:
+        file: アップロードされたファイルオブジェクト
+        
+    Returns:
+        bool: 画像ファイルが有効な場合True、そうでなければFalse
+        
+    Note:
+        ファイルポインタは関数終了後に先頭に戻されます
+    """
     try:
         img = Image.open(file)
         img.verify()
@@ -37,7 +83,25 @@ def is_valid_image(file):
         return False
 
 def create_watermark_pdf_from_image(image_file, page_width, page_height, opacity=0.3):
-    """画像から透かし用PDFを作成"""
+    """
+    画像ファイルから透かし用PDFを作成する関数
+    
+    Args:
+        image_file: 透かし用の画像ファイル
+        page_width (float): ページの幅
+        page_height (float): ページの高さ  
+        opacity (float): 透明度（0.0-1.0、デフォルト: 0.3）
+        
+    Returns:
+        io.BytesIO: 生成された透かしPDFのバイナリデータ
+        
+    Raises:
+        Exception: 透かしPDFの作成に失敗した場合
+        
+    Note:
+        画像は指定されたページサイズに合わせてスケーリングされ、
+        中央に配置されます。
+    """
     try:
         # 画像を開く
         img = Image.open(image_file)
@@ -86,10 +150,28 @@ def create_watermark_pdf_from_image(image_file, page_width, page_height, opacity
 
 @app.route('/')
 def index():
+    """
+    アプリケーションのメインページを表示
+    
+    Returns:
+        str: レンダリングされたHTMLテンプレート
+    """
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    """
+    PDFファイルをアップロードし、基本情報を取得するエンドポイント
+    
+    Returns:
+        json: PDFファイルの情報（ページ数、ファイル名、ファイルサイズ）
+              またはエラーメッセージ
+              
+    HTTP Status Codes:
+        200: 成功
+        400: ファイル関連のエラー（未選択、不正な形式など）
+        500: サーバー内部エラー
+    """
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'ファイルがありません'}), 400
@@ -120,6 +202,20 @@ def upload_file():
 
 @app.route('/extract-text', methods=['POST'])
 def extract_text():
+    """
+    PDFファイルからテキストを抽出するエンドポイント
+    
+    Returns:
+        json: 抽出されたテキスト内容またはエラーメッセージ
+        
+    HTTP Status Codes:
+        200: 成功
+        400: ファイル関連のエラー
+        500: サーバー内部エラー
+        
+    Note:
+        各ページのテキストが改行で区切られて返されます
+    """
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'ファイルがありません'}), 400
@@ -144,6 +240,21 @@ def extract_text():
 
 @app.route('/merge-pdfs', methods=['POST'])
 def merge_pdfs():
+    """
+    複数のPDFファイルを結合するエンドポイント
+    
+    Form Data:
+        files[]: 結合するPDFファイルの配列（順序が保持されます）
+        
+    Returns:
+        file: 結合されたPDFファイル (merged.pdf)
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー
+        500: サーバー内部エラー
+    """
     try:
         if 'files[]' not in request.files:
             return jsonify({'error': 'ファイルがありません'}), 400
@@ -179,6 +290,22 @@ def merge_pdfs():
 
 @app.route('/split-pdf', methods=['POST'])
 def split_pdf():
+    """
+    PDFファイルを指定したページ範囲で分割するエンドポイント
+    
+    Form Data:
+        file: 分割対象のPDFファイル
+        split_pages: ページ範囲（例: "1-3,5,7-9"）
+        
+    Returns:
+        file: 分割されたPDFファイル
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー、無効なページ範囲
+        500: サーバー内部エラー
+    """
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'ファイルがありません'}), 400
@@ -244,6 +371,24 @@ def split_pdf():
 
 @app.route('/rotate-pdf', methods=['POST'])
 def rotate_pdf():
+    """
+    PDFファイルのページを回転するエンドポイント
+    
+    Form Data:
+        file: 回転対象のPDFファイル
+        rotation: 回転角度（90, 180, 270度）
+        rotate_type: 回転対象（"all" または "specific"）
+        rotate_pages: 特定ページ指定時のページ範囲（例: "1,3,5-7"）
+        
+    Returns:
+        file: 回転処理されたPDFファイル
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー、無効なパラメータ
+        500: サーバー内部エラー
+    """
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'ファイルがありません'}), 400
@@ -335,6 +480,26 @@ def rotate_pdf():
 
 @app.route('/add-watermark', methods=['POST'])
 def add_watermark():
+    """
+    PDFファイルに透かしを追加するエンドポイント
+    
+    Form Data:
+        file: 透かしを追加するメインPDFファイル
+        watermark: 透かし用ファイル（PDF、PNG、JPG、JPEG、GIF、BMP）
+        
+    Returns:
+        file: 透かしが追加されたPDFファイル (watermarked.pdf)
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー、対応していないファイル形式
+        500: サーバー内部エラー
+        
+    Note:
+        画像ファイルは自動的に透明度0.3で透かしPDFに変換されます。
+        各ページのサイズに合わせて透かしがスケーリングされます。
+    """
     try:
         if 'file' not in request.files or 'watermark' not in request.files:
             return jsonify({'error': 'メインファイルまたは透かしファイルがありません'}), 400
@@ -422,6 +587,26 @@ def add_watermark():
 
 @app.route('/delete-pages', methods=['POST'])
 def delete_pages():
+    """
+    PDFファイルから指定したページを削除するエンドポイント
+    
+    Form Data:
+        file: ページ削除対象のPDFファイル
+        delete_pages: 削除するページ範囲（例: "1,3,5-7"）
+        
+    Returns:
+        file: ページが削除されたPDFファイル
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー、無効なページ範囲、全ページ削除指定
+        500: サーバー内部エラー
+        
+    Note:
+        指定されたページ以外のページで新しいPDFが作成されます。
+        全ページが削除対象の場合はエラーが返されます。
+    """
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'ファイルがありません'}), 400
