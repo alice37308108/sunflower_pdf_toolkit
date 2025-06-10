@@ -20,16 +20,16 @@ PDF処理ツールキット Web アプリケーション
 バージョン: 1.0
 """
 
-from flask import Flask, request, render_template, send_file, jsonify
-from PyPDF2 import PdfReader, PdfWriter, PdfMerger
-import os
-from dotenv import load_dotenv
 import io
-from werkzeug.utils import secure_filename
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.utils import ImageReader
+import os
+
 from PIL import Image
+from PyPDF2 import PdfReader, PdfWriter, PdfMerger
+from dotenv import load_dotenv
+from flask import Flask, request, render_template, send_file, jsonify
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 load_dotenv()
