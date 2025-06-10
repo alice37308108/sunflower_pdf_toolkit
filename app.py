@@ -15,9 +15,6 @@ PDF処理ツールキット Web アプリケーション
 - PyPDF2（PDF処理）
 - ReportLab（PDF生成）
 - PIL（画像処理）
-
-作成者: Sunflower PDF Toolkit
-バージョン: 1.0
 """
 
 import io
