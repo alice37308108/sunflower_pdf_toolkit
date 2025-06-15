@@ -678,5 +678,95 @@ def delete_pages():
     except Exception as e:
         return jsonify({'error': f'ページ削除中にエラーが発生しました: {str(e)}'}), 500
 
+@app.route('/insert-pdf', methods=['POST'])
+def insert_pdf():
+    """
+    PDFファイルの指定した位置に別のPDFファイルを挿入するエンドポイント
+    
+    Form Data:
+        main_file: メインのPDFファイル
+        insert_file: 挿入するPDFファイル
+        insert_position: 挿入位置（例: 5 = 5ページ目に挿入）
+        
+    Returns:
+        file: PDFが挿入された新しいPDFファイル
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー、無効な挿入位置
+        500: サーバー内部エラー
+        
+    Note:
+        挿入位置は1ベースで指定します（1 = 最初のページの前に挿入、2 = 1ページ目と2ページ目の間に挿入）
+        メインPDFが10ページの場合、1-11の位置を指定できます
+    """
+    try:
+        if 'main_file' not in request.files or 'insert_file' not in request.files:
+            return jsonify({'error': 'メインファイルまたは挿入ファイルがありません'}), 400
+
+        main_file = request.files['main_file']
+        insert_file = request.files['insert_file']
+        insert_position = request.form.get('insert_position', '')
+        
+        if main_file.filename == '' or insert_file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+
+        # 両方のファイルがPDFである必要があります
+        if not main_file.filename.endswith('.pdf') or not insert_file.filename.endswith('.pdf'):
+            return jsonify({'error': 'すべてのファイルはPDF形式である必要があります'}), 400
+
+        if not is_valid_pdf(main_file) or not is_valid_pdf(insert_file):
+            return jsonify({'error': 'PDFファイルの読み込みに失敗しました。ファイルが破損しているか、正しいPDF形式ではありません。'}), 400
+
+        if not insert_position.strip():
+            return jsonify({'error': '挿入位置が指定されていません'}), 400
+
+        try:
+            position = int(insert_position)
+        except ValueError:
+            return jsonify({'error': '挿入位置は数値で指定してください'}), 400
+
+        main_reader = PdfReader(main_file)
+        insert_reader = PdfReader(insert_file)
+        writer = PdfWriter()
+        
+        main_pages_count = len(main_reader.pages)
+        
+        # 挿入位置の妥当性チェック（1からメインページ数+1まで）
+        if position < 1 or position > main_pages_count + 1:
+            return jsonify({'error': f'挿入位置は1から{main_pages_count + 1}の範囲で指定してください'}), 400
+
+        # 挿入位置より前のページを追加
+        for i in range(position - 1):
+            writer.add_page(main_reader.pages[i])
+        
+        # 挿入するPDFのすべてのページを追加
+        for page in insert_reader.pages:
+            writer.add_page(page)
+        
+        # 挿入位置より後のページを追加
+        for i in range(position - 1, main_pages_count):
+            writer.add_page(main_reader.pages[i])
+
+        output = io.BytesIO()
+        writer.write(output)
+        output.seek(0)
+        
+        # 元のファイル名を基に新しいファイル名を生成
+        main_name = os.path.splitext(main_file.filename)[0]
+        insert_name = os.path.splitext(insert_file.filename)[0]
+        new_filename = f'{main_name}_inserted_at_{position}.pdf'
+        
+        return send_file(
+            output,
+            download_name=new_filename,
+            as_attachment=True,
+            mimetype='application/pdf'
+        )
+            
+    except Exception as e:
+        return jsonify({'error': f'PDF挿入中にエラーが発生しました: {str(e)}'}), 500
+
 if __name__ == '__main__':
     app.run(debug=True) 

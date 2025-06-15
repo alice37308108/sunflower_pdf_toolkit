@@ -389,6 +389,10 @@
                             <span class="btn-icon">🗑️</span>
                             <span class="btn-text">ページ削除</span>
                         </button>
+                        <button type="button" class="operation-btn" data-operation="insert">
+                            <span class="btn-icon">📄</span>
+                            <span class="btn-text">PDF挿入</span>
+                        </button>
                         <button type="button" class="operation-btn" data-operation="watermark">
                             <span class="btn-icon">🏷️</span>
                             <span class="btn-text">透かし追加</span>
@@ -466,6 +470,21 @@
                             <input type="file" name="watermark" id="watermarkFile" accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp">
                         </div>
                         <button type="submit">透かし追加</button>
+                    </div>
+
+                    <!-- PDF挿入オプション -->
+                    <div id="insertOptions" class="operation-panel">
+                        <h3>PDF挿入設定</h3>
+                        <div class="form-group">
+                            <label for="insertFile">挿入するPDFファイル:</label>
+                            <input type="file" name="insert_file" id="insertFile" accept=".pdf">
+                        </div>
+                        <div class="form-group">
+                            <label for="insertPosition">挿入位置:</label>
+                            <input type="number" name="insert_position" id="insertPosition" min="1" placeholder="例: 5（5ページ目に挿入）">
+                        </div>
+                        <p class="help-text">例: 10ページのPDFで「5」を指定すると、4ページ目と5ページ目の間に挿入されます</p>
+                        <button type="submit">PDF挿入実行</button>
                     </div>
                 </form>
                 <div id="result" class="result"></div>
@@ -571,9 +590,10 @@
         const form = document.getElementById('pdfForm');
         const mergeOptions = document.getElementById('mergeOptions');
         const splitOptions = document.getElementById('splitOptions');
-        const rotateOptions = document.getElementById('rotateOptions');
+        const rotateOptions = document.getElementById('rotateOptions');  
         const deleteOptions = document.getElementById('deleteOptions');
         const watermarkOptions = document.getElementById('watermarkOptions');
+        const insertOptions = document.getElementById('insertOptions');
         const result = document.getElementById('result');
         
         let currentOperation = null;
@@ -597,7 +617,7 @@
         
         function updateUIForOperation(operation) {
             // 全てのパネルを非表示
-            const panels = [mergeOptions, splitOptions, rotateOptions, deleteOptions, watermarkOptions];
+            const panels = [mergeOptions, splitOptions, rotateOptions, deleteOptions, watermarkOptions, insertOptions];
             panels.forEach(panel => panel.style.display = 'none');
             
             // メインファイル選択とページプレビューの表示制御
@@ -626,6 +646,9 @@
                         break;
                     case 'watermark':
                         watermarkOptions.style.display = 'block';
+                        break;
+                    case 'insert':
+                        insertOptions.style.display = 'block';
                         break;
                 }
             }
@@ -690,6 +713,15 @@
                 return;
             }
             
+            // PDF挿入の場合、メインファイルの名前を変更
+            if (op === 'insert') {
+                const mainFile = formData.get('file');
+                if (mainFile) {
+                    formData.delete('file');
+                    formData.append('main_file', mainFile);
+                }
+            }
+            
             // 回転処理の場合、特定のページが選択されているときの検証
             if (op === 'rotate') {
                 const rotateType = document.getElementById('rotateType').value;
@@ -717,6 +749,9 @@
                     break;
                 case 'watermark':
                     endpoint = '/add-watermark';
+                    break;
+                case 'insert':
+                    endpoint = '/insert-pdf';
                     break;
             }
             
@@ -751,6 +786,9 @@
                         break;
                     case 'watermark':
                         filename = 'watermarked.pdf';
+                        break;
+                    case 'insert':
+                        filename = 'inserted.pdf';
                         break;
                 }
 
