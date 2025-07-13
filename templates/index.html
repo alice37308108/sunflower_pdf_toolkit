@@ -16,8 +16,8 @@
         
         body {
             font-family: "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3", Meiryo, メイリオ, Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
+            max-width: 100%;
+            margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, var(--summer-sky) 0%, var(--warm-white) 100%);
             min-height: 100vh;
@@ -52,16 +52,21 @@
         .container {
             display: flex;
             gap: 20px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
         }
 
-        .control-panel {
+        .menu-panel {
             flex: 1;
-            min-width: 300px;
+            min-width: 250px;
+        }
+
+        .settings-panel {
+            flex: 1;
+            min-width: 250px;
         }
 
         .viewer-panel {
-            flex: 2;
+            flex: 3;
             min-width: 600px;
         }
 
@@ -277,7 +282,7 @@
 
         .button-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -320,16 +325,20 @@
             text-align: center;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 900px) {
             .container {
                 flex-direction: column;
             }
             
-            .viewer-panel {
+            .menu-panel {
                 min-width: 100%;
             }
             
-            .control-panel {
+            .settings-panel {
+                min-width: 100%;
+            }
+            
+            .viewer-panel {
                 min-width: 100%;
             }
         }
@@ -388,7 +397,7 @@
     <h1>PDF処理アプリケーション</h1>
 
     <div class="container">
-        <div class="control-panel">
+        <div class="menu-panel">
             <div class="section">
                 <h2>📄 PDFファイル処理</h2>
                 
@@ -426,7 +435,13 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
 
+        <div class="settings-panel">
+            <div class="section">
+                <h2>⚙️ 設定パネル</h2>
+                
                 <form id="pdfForm">
                     <!-- メインファイル選択（結合以外で表示） -->
                     <div id="mainFileSection" class="form-group" style="display: none;">
@@ -519,19 +534,19 @@
                         <h3>ファイル名変更(電帳法)</h3>
                         <div class="form-group">
                             <label for="metaDate">日付:</label>
-                            <input type="text" name="date" id="metaDate" placeholder="20250713" required>
+                            <input type="text" name="date" id="metaDate" placeholder="20250713">
                         </div>
                         <div class="form-group">
                             <label for="metaPartner">取引先:</label>
-                            <input type="text" name="partner" id="metaPartner" placeholder="㈱ひまわり" required>
+                            <input type="text" name="partner" id="metaPartner" placeholder="㈱ひまわり">
                         </div>
                         <div class="form-group">
                             <label for="metaAmount">金額:</label>
-                            <input type="text" name="amount" id="metaAmount" placeholder="10000" required>
+                            <input type="text" name="amount" id="metaAmount" placeholder="10000">
                         </div>
                         <div class="form-group">
                             <label for="metaSeparator">結合文字:</label>
-                            <input type="text" name="separator" id="metaSeparator" placeholder="-" required>
+                            <input type="text" name="separator" id="metaSeparator" placeholder="-">
                         </div>
                         <p class="help-text">※ 例: 20250713-㈱ひまわり-10000.pdf で保存されます</p>
                         <button type="submit">ファイル名生成実行</button>
@@ -556,15 +571,19 @@
     </div>
 
     <script>
-        // PDFビューアーの初期化
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        
-        let pdfDoc = null;
-        let pageNum = 1;
-        let scale = 1.0;
-        const container = document.getElementById('pdf-container');
-        const pageNumInput = document.getElementById('page-num');
-        const pageCount = document.getElementById('page-count');
+        // DOMが読み込まれるまで待機
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM読み込み完了');
+            
+            // PDFビューアーの初期化
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            
+            let pdfDoc = null;
+            let pageNum = 1;
+            let scale = 1.0;
+            const container = document.getElementById('pdf-container');
+            const pageNumInput = document.getElementById('page-num');
+            const pageCount = document.getElementById('page-count');
         
         async function renderPage(num) {
             const page = await pdfDoc.getPage(num);
@@ -652,6 +671,8 @@
         // 操作ボタンのイベントリスナー
         document.querySelectorAll('.operation-btn').forEach(btn => {
             btn.addEventListener('click', function() {
+                console.log('操作ボタンがクリックされました:', this.dataset.operation);
+                
                 // 全てのボタンからactiveクラスを削除
                 document.querySelectorAll('.operation-btn').forEach(b => b.classList.remove('active'));
                 
@@ -660,6 +681,7 @@
                 
                 // 現在の操作を設定
                 currentOperation = this.dataset.operation;
+                console.log('現在の操作:', currentOperation);
                 
                 // パネルとファイル選択の表示を更新
                 updateUIForOperation(currentOperation);
@@ -667,9 +689,16 @@
         });
         
         function updateUIForOperation(operation) {
-            // 全てのパネルを非表示
+            console.log('updateUIForOperation called with:', operation);
+            
+            // 全てのパネルのactiveクラスを削除
             const panels = [mergeOptions, splitOptions, rotateOptions, deleteOptions, watermarkOptions, insertOptions, metadataOptions];
-            panels.forEach(panel => panel.style.display = 'none');
+            panels.forEach(panel => panel.classList.remove('active'));
+            
+            // 全てのメタデータ入力フィールドのrequired属性を削除する
+            document.querySelectorAll('#metadataOptions input').forEach(input => {
+                input.removeAttribute('required');
+            });
             
             // メインファイル選択とページプレビューの表示制御
             const mainFileSection = document.getElementById('mainFileSection');
@@ -679,7 +708,8 @@
                 // 結合の場合：メインファイル選択を非表示、結合パネルを表示
                 mainFileSection.style.display = 'none';
                 pagePreview.style.display = 'none';
-                mergeOptions.style.display = 'block';
+                mergeOptions.classList.add('active');
+                console.log('結合パネルを表示');
             } else {
                 // その他の場合：メインファイル選択を表示
                 mainFileSection.style.display = 'block';
@@ -687,22 +717,32 @@
                 
                 switch(operation) {
                     case 'split':
-                        splitOptions.style.display = 'block';
+                        splitOptions.classList.add('active');
+                        console.log('分割パネルを表示');
                         break;
                     case 'rotate':
-                        rotateOptions.style.display = 'block';
+                        rotateOptions.classList.add('active');
+                        console.log('回転パネルを表示');
                         break;
                     case 'delete':
-                        deleteOptions.style.display = 'block';
+                        deleteOptions.classList.add('active');
+                        console.log('削除パネルを表示');
                         break;
                     case 'watermark':
-                        watermarkOptions.style.display = 'block';
+                        watermarkOptions.classList.add('active');
+                        console.log('ウォーターマークパネルを表示');
                         break;
                     case 'insert':
-                        insertOptions.style.display = 'block';
+                        insertOptions.classList.add('active');
+                        console.log('挿入パネルを表示');
                         break;
                     case 'metadata':
-                        metadataOptions.style.display = 'block';
+                        metadataOptions.classList.add('active');
+                        // メタデータパネルの場合のみrequired属性を追加する
+                        document.querySelectorAll('#metadataOptions input').forEach(input => {
+                            input.setAttribute('required', 'required');
+                        });
+                        console.log('メタデータパネルを表示');
                         break;
                 }
             }
@@ -762,8 +802,10 @@
         
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
+            console.log('フォームが送信されました');
             const formData = new FormData(this);
             const op = currentOperation;
+            console.log('現在の操作:', op);
             if (!op) {
                 alert('処理を選択してください');
                 return;
@@ -1057,6 +1099,8 @@
             this.classList.remove('dragging');
             draggedElement = null;
         }
+        
+        }); // DOMContentLoadedイベントリスナーの終了
     </script>
 </body>
 </html> 
