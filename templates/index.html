@@ -359,6 +359,29 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* 電子帳簿保存法対応のスタイリング */
+        #metadataOptions label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--sunflower-brown);
+        }
+
+        #metadataOptions input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid var(--sunflower-yellow);
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        #metadataOptions input[type="text"]:focus {
+            outline: none;
+            border-color: var(--sunflower-green);
+            box-shadow: 0 0 5px rgba(34, 139, 34, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -396,6 +419,10 @@
                         <button type="button" class="operation-btn" data-operation="watermark">
                             <span class="btn-icon">🏷️</span>
                             <span class="btn-text">透かし追加</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="metadata">
+                            <span class="btn-icon">📊</span>
+                            <span class="btn-text">ファイル名変更<br>(電帳法)</span>
                         </button>
                     </div>
                 </div>
@@ -485,6 +512,29 @@
                         </div>
                         <p class="help-text">例: 10ページのPDFで「5」を指定すると、4ページ目と5ページ目の間に挿入されます</p>
                         <button type="submit">PDF挿入実行</button>
+                    </div>
+
+                    <!-- 電子帳簿保存法対応オプション -->
+                    <div id="metadataOptions" class="operation-panel">
+                        <h3>ファイル名変更(電帳法)</h3>
+                        <div class="form-group">
+                            <label for="metaDate">日付:</label>
+                            <input type="text" name="date" id="metaDate" placeholder="20250713" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="metaPartner">取引先:</label>
+                            <input type="text" name="partner" id="metaPartner" placeholder="㈱ひまわり" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="metaAmount">金額:</label>
+                            <input type="text" name="amount" id="metaAmount" placeholder="10000" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="metaSeparator">結合文字:</label>
+                            <input type="text" name="separator" id="metaSeparator" placeholder="-" required>
+                        </div>
+                        <p class="help-text">※ 例: 20250713-㈱ひまわり-10000.pdf で保存されます</p>
+                        <button type="submit">ファイル名生成実行</button>
                     </div>
                 </form>
                 <div id="result" class="result"></div>
@@ -594,6 +644,7 @@
         const deleteOptions = document.getElementById('deleteOptions');
         const watermarkOptions = document.getElementById('watermarkOptions');
         const insertOptions = document.getElementById('insertOptions');
+        const metadataOptions = document.getElementById('metadataOptions');
         const result = document.getElementById('result');
         
         let currentOperation = null;
@@ -617,7 +668,7 @@
         
         function updateUIForOperation(operation) {
             // 全てのパネルを非表示
-            const panels = [mergeOptions, splitOptions, rotateOptions, deleteOptions, watermarkOptions, insertOptions];
+            const panels = [mergeOptions, splitOptions, rotateOptions, deleteOptions, watermarkOptions, insertOptions, metadataOptions];
             panels.forEach(panel => panel.style.display = 'none');
             
             // メインファイル選択とページプレビューの表示制御
@@ -649,6 +700,9 @@
                         break;
                     case 'insert':
                         insertOptions.style.display = 'block';
+                        break;
+                    case 'metadata':
+                        metadataOptions.style.display = 'block';
                         break;
                 }
             }
@@ -704,6 +758,8 @@
             }
         });
         
+
+        
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             const formData = new FormData(this);
@@ -753,6 +809,9 @@
                 case 'insert':
                     endpoint = '/insert-pdf';
                     break;
+                case 'metadata':
+                    endpoint = '/edit-metadata';
+                    break;
             }
             
             try {
@@ -771,25 +830,48 @@
 
                 // ファイル名を決定
                 let filename = '';
-                switch(op) {
-                    case 'merge':
-                        filename = 'merged.pdf';
-                        break;
-                    case 'split':
-                        filename = 'split.pdf';
-                        break;
-                    case 'rotate':
-                        filename = 'rotated.pdf';
-                        break;
-                    case 'delete':
-                        filename = 'pages_deleted.pdf';
-                        break;
-                    case 'watermark':
-                        filename = 'watermarked.pdf';
-                        break;
-                    case 'insert':
-                        filename = 'inserted.pdf';
-                        break;
+                
+                // Content-Dispositionヘッダーからファイル名を取得（メタデータ操作用）
+                const contentDisposition = response.headers.get('Content-Disposition');
+                if (contentDisposition) {
+                    // 通常のfilename="..."形式をチェック
+                    let match = contentDisposition.match(/filename="([^"]+)"/);
+                    if (match) {
+                        filename = match[1];
+                    } else {
+                        // filename*=UTF-8''...形式をチェック（日本語ファイル名）
+                        match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
+                        if (match) {
+                            filename = decodeURIComponent(match[1]);
+                        }
+                    }
+                }
+                
+                // ファイル名が取得できない場合、操作に応じてデフォルト名を設定
+                if (!filename) {
+                    switch(op) {
+                        case 'merge':
+                            filename = 'merged.pdf';
+                            break;
+                        case 'split':
+                            filename = 'split.pdf';
+                            break;
+                        case 'rotate':
+                            filename = 'rotated.pdf';
+                            break;
+                        case 'delete':
+                            filename = 'pages_deleted.pdf';
+                            break;
+                        case 'watermark':
+                            filename = 'watermarked.pdf';
+                            break;
+                        case 'insert':
+                            filename = 'inserted.pdf';
+                            break;
+                        case 'metadata':
+                            filename = 'bookkeeping.pdf';
+                            break;
+                    }
                 }
 
                 // プレビューを更新

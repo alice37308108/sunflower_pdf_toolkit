@@ -768,5 +768,213 @@ def insert_pdf():
     except Exception as e:
         return jsonify({'error': f'PDF挿入中にエラーが発生しました: {str(e)}'}), 500
 
+@app.route('/get-metadata', methods=['POST'])
+def get_metadata():
+    """
+    PDFファイルのメタデータを取得するエンドポイント
+    
+    Form Data:
+        file: メタデータを取得するPDFファイル
+        
+    Returns:
+        json: PDFメタデータ情報またはエラーメッセージ
+        
+    HTTP Status Codes:
+        200: 成功
+        400: ファイル関連のエラー
+        500: サーバー内部エラー
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルがありません'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.pdf'):
+            return jsonify({'error': 'PDFファイルのみ対応しています'}), 400
+
+        if not is_valid_pdf(file):
+            return jsonify({'error': 'PDFファイルの読み込みに失敗しました。ファイルが破損しているか、正しいPDF形式ではありません。'}), 400
+        
+        reader = PdfReader(file)
+        metadata = reader.metadata
+        
+        # メタデータを辞書形式で整理
+        metadata_dict = {
+            'title': metadata.get('/Title', '') if metadata else '',
+            'author': metadata.get('/Author', '') if metadata else '',
+            'subject': metadata.get('/Subject', '') if metadata else '',
+            'keywords': metadata.get('/Keywords', '') if metadata else '',
+            'creator': metadata.get('/Creator', '') if metadata else '',
+            'producer': metadata.get('/Producer', '') if metadata else '',
+            'creation_date': str(metadata.get('/CreationDate', '')) if metadata else '',
+            'modification_date': str(metadata.get('/ModDate', '')) if metadata else '',
+            'pages': len(reader.pages),
+            'filename': file.filename
+        }
+        
+        return jsonify(metadata_dict)
+        
+    except Exception as e:
+        return jsonify({'error': f'メタデータの取得中にエラーが発生しました: {str(e)}'}), 500
+
+@app.route('/edit-metadata', methods=['POST'])
+def edit_metadata():
+    """
+    PDFファイルのメタデータを編集するエンドポイント（電子帳簿保存法対応）
+    
+    Form Data:
+        file: メタデータを編集するPDFファイル
+        date: 日付（例: 20250713）
+        partner: 取引先（例: ㈱あいうえ）
+        amount: 金額（例: 100）
+        separator: 結合文字（例: -）
+        
+    Returns:
+        file: メタデータが編集されたPDFファイル
+        json: エラーメッセージ（失敗時）
+        
+    HTTP Status Codes:
+        200: 成功（PDFファイル返却）
+        400: ファイル関連のエラー
+        500: サーバー内部エラー
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルがありません'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.pdf'):
+            return jsonify({'error': 'PDFファイルのみ対応しています'}), 400
+
+        if not is_valid_pdf(file):
+            return jsonify({'error': 'PDFファイルの読み込みに失敗しました。ファイルが破損しているか、正しいPDF形式ではありません。'}), 400
+        
+        # フォームデータから各フィールドを取得
+        date = request.form.get('date', '').strip()
+        partner = request.form.get('partner', '').strip()
+        amount = request.form.get('amount', '').strip()
+        separator = request.form.get('separator', '').strip()
+        
+        # 必須フィールドのチェック
+        if not date:
+            return jsonify({'error': '日付を入力してください'}), 400
+        if not partner:
+            return jsonify({'error': '取引先を入力してください'}), 400
+        if not amount:
+            return jsonify({'error': '金額を入力してください'}), 400
+        if not separator:
+            return jsonify({'error': '結合文字を入力してください'}), 400
+        
+        # ファイル名を構築
+        title = f"{date}{separator}{partner}{separator}{amount}"
+        
+        reader = PdfReader(file)
+        writer = PdfWriter()
+        
+        # 全ページをコピー
+        for page in reader.pages:
+            writer.add_page(page)
+        
+        # 既存のメタデータを保持しつつ、タイトルのみを更新
+        existing_metadata = reader.metadata or {}
+        metadata = {}
+        
+        # 既存のメタデータを保持
+        for key, value in existing_metadata.items():
+            if key != '/Title':  # タイトル以外は既存の値を保持
+                metadata[key] = value
+        
+        # タイトルを更新
+        metadata['/Title'] = title
+        
+        # 現在の日時を更新日として設定
+        from datetime import datetime
+        metadata['/ModDate'] = datetime.now().strftime("D:%Y%m%d%H%M%S")
+        
+        writer.add_metadata(metadata)
+        
+        output = io.BytesIO()
+        writer.write(output)
+        output.seek(0)
+        
+        # タイトルをファイル名として使用（安全な文字に変換）
+        import re
+        
+        # 安全でない文字を削除または置換
+        safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
+        safe_title = safe_title.strip()
+        
+        # 空の場合は元のファイル名を使用
+        if not safe_title:
+            safe_title = os.path.splitext(file.filename)[0]
+        
+        # 長すぎる場合は短縮
+        if len(safe_title) > 200:
+            safe_title = safe_title[:200]
+            
+        new_filename = f"{safe_title}.pdf"
+        
+        # デバッグ情報を出力
+        print(f"元のタイトル: {title}")
+        print(f"安全なタイトル: {safe_title}")
+        print(f"新しいファイル名: {new_filename}")
+        
+        # 一時ファイルを作成してから送信
+        import tempfile
+        import uuid
+        
+        # 一時ファイルを作成
+        temp_dir = tempfile.gettempdir()
+        temp_id = str(uuid.uuid4())
+        temp_path = os.path.join(temp_dir, f"{temp_id}.pdf")
+        
+        # 一時ファイルにPDFを保存
+        with open(temp_path, 'wb') as temp_file:
+            temp_file.write(output.getvalue())
+        
+        # ファイル送信後に削除するためのコールバック
+        def remove_file(response):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+            return response
+        
+        # 日本語ファイル名を適切にエンコード
+        import urllib.parse
+        encoded_filename = urllib.parse.quote(new_filename.encode('utf-8'))
+        
+        # レスポンスを作成
+        response = send_file(
+            temp_path,
+            as_attachment=True,
+            mimetype='application/pdf'
+        )
+        
+        # Content-Dispositionヘッダーを明示的に設定（日本語対応）
+        # 日本語文字が含まれる場合は、filename*パラメータのみを使用
+        try:
+            # ASCII文字のみかチェック
+            new_filename.encode('ascii')
+            # ASCII文字のみの場合は通常のfilename
+            response.headers['Content-Disposition'] = f'attachment; filename="{new_filename}"'
+        except UnicodeEncodeError:
+            # 日本語文字が含まれる場合は、filename*のみを使用
+            response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{encoded_filename}'
+        
+        # ファイル削除のコールバックを追加
+        response.call_on_close(lambda: remove_file(response))
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'error': f'メタデータの編集中にエラーが発生しました: {str(e)}'}), 500
+
 if __name__ == '__main__':
     app.run(debug=True) 
